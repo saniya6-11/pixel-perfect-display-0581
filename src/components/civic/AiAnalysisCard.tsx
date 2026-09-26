@@ -29,7 +29,7 @@ export function AiAnalysisCard({
             <p className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-white">
               AI Analysis
             </p>
-            <p className="text-xs text-white/65">Model verdict with confidence scoring</p>
+            <p className="text-xs text-white/65">Issue classification with confidence scoring</p>
           </div>
         </div>
         <Sparkles className="size-5 text-white/70" aria-hidden />
@@ -62,10 +62,18 @@ export function AiAnalysisCard({
           </Field>
 
           <Field label="Potential duplicates">
-            <p className="text-sm">
-              <span className="font-display text-lg font-bold">{analysis.duplicateCount}</span>{" "}
-              <span className="text-muted-foreground">nearby reports may match</span>
-            </p>
+            {analysis.duplicateCount > 0 ? (
+              <>
+                <p className="font-display text-sm font-bold">
+                  Possible duplicates: {analysis.duplicateCount}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Similar reports may refer to the same civic issue.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No similar reports detected</p>
+            )}
           </Field>
         </div>
 
@@ -73,7 +81,7 @@ export function AiAnalysisCard({
       </div>
 
       <div className="grid gap-3 border-t border-border p-5 sm:grid-cols-2">
-        <Callout icon={ShieldAlert} title="Detected issue" body={analysis.detectedIssue} />
+        <Callout icon={ShieldAlert} title="Analysis summary" body={analysis.detectedIssue} />
         <Callout icon={Wrench} title="Recommended action" body={analysis.recommendedAction} />
       </div>
 
@@ -88,12 +96,6 @@ export function AiAnalysisCard({
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{factor.label}</span>
                   <span className="font-semibold">{factor.value}</span>
-                </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary/70"
-                    style={{ width: `${Math.min(100, factor.weight)}%` }}
-                  />
                 </div>
               </li>
             ))}

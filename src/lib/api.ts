@@ -139,7 +139,6 @@ function factorsToList(factors: Record<string, number> = {}) {
   return Object.entries(factors).map(([key, value]) => ({
     label: labels[key] ?? key.replaceAll("_", " "),
     value: `${value} pts`,
-    weight: Math.min(100, Math.max(0, value * 2)),
   }));
 }
 

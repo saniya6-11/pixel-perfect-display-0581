@@ -24,13 +24,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "AI-powered civic issue detection, prioritization and geographic intelligence for smarter communities.",
+          "AI-powered civic issue analysis, prioritization and geographic intelligence for smarter communities.",
       },
       { property: "og:title", content: "CivicLens — Civic issue intelligence" },
       {
         property: "og:description",
         content:
-          "AI-powered civic issue detection, prioritization and geographic intelligence for smarter communities.",
+          "AI-powered civic issue analysis, prioritization and geographic intelligence for smarter communities.",
       },
     ],
   }),
@@ -40,8 +40,8 @@ export const Route = createFileRoute("/")({
 const features = [
   {
     icon: ScanSearch,
-    title: "AI-powered detection",
-    body: "Photos and descriptions are classified into civic categories with a confidence score.",
+    title: "AI-powered analysis",
+    body: "Report descriptions are classified into civic categories with a confidence score.",
   },
   {
     icon: Gauge,
@@ -110,7 +110,7 @@ function Landing() {
               <span className="text-gradient-accent">actionable intelligence.</span>
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-white/70 sm:text-lg">
-              AI-powered civic issue detection, prioritization and geographic intelligence for
+              AI-powered civic issue analysis, prioritization and geographic intelligence for
               smarter communities.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">

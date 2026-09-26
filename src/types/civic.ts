@@ -13,7 +13,6 @@ export interface Location {
 export interface AnalysisFactor {
   label: string;
   value: string;
-  weight: number; // 0-100
 }
 
 export interface AIAnalysis {

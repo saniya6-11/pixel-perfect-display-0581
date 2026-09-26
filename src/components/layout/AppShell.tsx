@@ -1,8 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { Bell, Menu, Search, ShieldCheck } from "lucide-react";
+import { Menu, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarContent } from "./Sidebar";
@@ -52,19 +51,7 @@ export function AppShell({
             <span className="font-display text-sm font-bold">CivicLens</span>
           </Link>
 
-          <div className="relative ms-auto hidden max-w-sm flex-1 md:block">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input placeholder="Search reports, wards, categories…" className="ps-9" />
-          </div>
-
           <div className="ms-auto flex items-center gap-1.5 md:ms-0">
-            <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
-              <Bell className="size-5" />
-              <span className="absolute right-2 top-2 size-2 rounded-full bg-critical" />
-            </Button>
             <Avatar className="size-9 border border-border">
               <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
                 SA

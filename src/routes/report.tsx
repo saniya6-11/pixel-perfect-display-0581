@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, MapPin } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { ImageUploader } from "@/components/civic/ImageUploader";
 import { Button } from "@/components/ui/button";
@@ -24,8 +24,14 @@ function ReportIssuePage() {
   const [address, setAddress] = useState("");
   const [latitude, setLatitude] = useState("12.9345");
   const [longitude, setLongitude] = useState("77.6101");
+  const [locationSource, setLocationSource] = useState<"demo" | "device" | "manual">("demo");
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const hasCoordinates = latitude.trim() !== "" && longitude.trim() !== "";
+  const coordinatesAreValid =
+    hasCoordinates && Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude));
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -53,6 +59,46 @@ function ReportIssuePage() {
     event.preventDefault();
     setError(null);
     createMutation.mutate();
+  };
+
+  const useCurrentLocation = () => {
+    setLocationError(null);
+    if (!navigator.geolocation) {
+      setLocationError("Location is not supported by this browser. Enter coordinates manually.");
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setLatitude(coords.latitude.toFixed(6));
+        setLongitude(coords.longitude.toFixed(6));
+        setLocationSource("device");
+        setLocating(false);
+      },
+      (cause) => {
+        const message =
+          cause.code === cause.PERMISSION_DENIED
+            ? "Location permission was denied. Allow location access or enter coordinates manually."
+            : cause.code === cause.POSITION_UNAVAILABLE
+              ? "Your location is unavailable right now. Enter coordinates manually."
+              : "We couldn't get your location in time. Try again or enter coordinates manually.";
+        setLocationError(message);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  };
+
+  const updateLatitude = (value: string) => {
+    setLocationError(null);
+    setLatitude(value);
+    setLocationSource("manual");
+  };
+  const updateLongitude = (value: string) => {
+    setLocationError(null);
+    setLongitude(value);
+    setLocationSource("manual");
   };
 
   return (
@@ -105,38 +151,73 @@ function ReportIssuePage() {
               placeholder="Street, landmark, or neighbourhood"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="report-latitude">Latitude</Label>
-              <Input
-                id="report-latitude"
-                type="number"
-                step="any"
-                min="-90"
-                max="90"
-                value={latitude}
-                onChange={(event) => setLatitude(event.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="report-longitude">Longitude</Label>
-              <Input
-                id="report-longitude"
-                type="number"
-                step="any"
-                min="-180"
-                max="180"
-                value={longitude}
-                onChange={(event) => setLongitude(event.target.value)}
-                required
-              />
-            </div>
+          <div className="space-y-3 rounded-lg border border-border bg-background p-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={useCurrentLocation}
+              disabled={locating}
+            >
+              {locating ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <MapPin className="size-4" />
+              )}
+              {locating ? "Finding your location…" : "Use my current location"}
+            </Button>
+            <p className="text-xs leading-relaxed text-muted-foreground" aria-live="polite">
+              {locationSource === "device"
+                ? "Current location detected: "
+                : locationSource === "manual"
+                  ? "Using manually entered coordinates: "
+                  : "Demo location (not your current location): "}
+              {coordinatesAreValid
+                ? `${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}`
+                : "Enter valid coordinates below."}
+            </p>
           </div>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Coordinates are prefilled with a demo location. Update them to place the report
-            accurately on the civic map.
-          </p>
+          {locationError ? (
+            <p
+              role="alert"
+              className="rounded-lg border border-critical/25 bg-critical-soft p-3 text-sm text-critical"
+            >
+              {locationError}
+            </p>
+          ) : null}
+          <details className="rounded-lg border border-border px-4 py-3">
+            <summary className="cursor-pointer text-sm font-medium">
+              Enter coordinates manually
+            </summary>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="report-latitude">Latitude</Label>
+                <Input
+                  id="report-latitude"
+                  type="number"
+                  step="any"
+                  min="-90"
+                  max="90"
+                  value={latitude}
+                  onChange={(event) => updateLatitude(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="report-longitude">Longitude</Label>
+                <Input
+                  id="report-longitude"
+                  type="number"
+                  step="any"
+                  min="-180"
+                  max="180"
+                  value={longitude}
+                  onChange={(event) => updateLongitude(event.target.value)}
+                  required
+                />
+              </div>
+            </div>
+          </details>
           {error ? (
             <p
               role="alert"
