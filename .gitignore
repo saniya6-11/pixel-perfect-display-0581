@@ -30,3 +30,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# CivicLens backend runtime and local environment
+backend/.env
+backend/*.db
+__pycache__/
+*.py[cod]
+backend/.venv/
+
+# Temporary checkout used to import the Lovable frontend
+.frontend-import/

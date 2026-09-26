@@ -1,13 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import {
-  BarChart3,
-  Brain,
-  LayoutDashboard,
-  Map,
-  ScrollText,
-  Settings,
-  ShieldCheck,
-} from "lucide-react";
+import { BarChart3, Brain, LayoutDashboard, Map, ScrollText, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const navItems = [
@@ -16,7 +8,6 @@ export const navItems = [
   { to: "/map", label: "Civic Map", icon: Map },
   { to: "/ai-analysis", label: "AI Analysis", icon: Brain },
   { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {

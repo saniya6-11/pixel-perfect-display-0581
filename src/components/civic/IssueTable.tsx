@@ -14,16 +14,23 @@ export function IssueTable({ reports }: { reports: Report[] }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/60 text-left">
-              {["Issue", "Category", "Location", "Severity", "Priority", "Status", "Reported", ""].map(
-                (h) => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
-                  >
-                    {h}
-                  </th>
-                ),
-              )}
+              {[
+                "Issue",
+                "Category",
+                "Location",
+                "Severity",
+                "Priority",
+                "Status",
+                "Reported",
+                "",
+              ].map((h) => (
+                <th
+                  key={h}
+                  className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                >
+                  {h}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>

@@ -1,14 +1,8 @@
-export type IssueCategory =
-  | "road_damage"
-  | "waste"
-  | "water"
-  | "lighting"
-  | "safety"
-  | "other";
+export type IssueCategory = "road_damage" | "waste" | "water" | "lighting" | "safety" | "other";
 
 export type Severity = "critical" | "high" | "medium" | "low";
 
-export type IssueStatus = "new" | "under_review" | "assigned" | "resolved";
+export type IssueStatus = "new" | "under_review" | "assigned" | "in_progress" | "resolved";
 
 export interface Location {
   lat: number;
@@ -54,6 +48,7 @@ export interface Report {
 }
 
 export interface CreateReportInput {
+  title: string;
   description: string;
   imageDataUrl: string | null;
   location: Location;
@@ -102,6 +97,7 @@ export const STATUS_LABELS: Record<IssueStatus, string> = {
   new: "New",
   under_review: "Under Review",
   assigned: "Assigned",
+  in_progress: "In Progress",
   resolved: "Resolved",
 };
 

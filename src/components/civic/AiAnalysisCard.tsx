@@ -115,15 +115,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Callout({
-  icon: Icon,
-  title,
-  body,
-}: {
-  icon: typeof Copy;
-  title: string;
-  body: string;
-}) {
+function Callout({ icon: Icon, title, body }: { icon: typeof Copy; title: string; body: string }) {
   return (
     <div className="rounded-lg border border-border bg-background p-4">
       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

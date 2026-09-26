@@ -1,12 +1,7 @@
 import { AlertOctagon, AlertTriangle, CheckCircle2, CircleDot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { severityStyles, statusStyles } from "@/lib/civic-ui";
-import {
-  SEVERITY_LABELS,
-  STATUS_LABELS,
-  type IssueStatus,
-  type Severity,
-} from "@/types/civic";
+import { SEVERITY_LABELS, STATUS_LABELS, type IssueStatus, type Severity } from "@/types/civic";
 
 const severityIcon = {
   critical: AlertOctagon,

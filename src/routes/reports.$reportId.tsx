@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, ImageOff, MapPin, User } from "lucide-react";
+import { ArrowLeft, Brain, CalendarDays, ImageOff, Loader2, MapPin, User } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { AiAnalysisCard } from "@/components/civic/AiAnalysisCard";
 import { StatusTimeline } from "@/components/civic/StatusTimeline";
@@ -47,9 +47,23 @@ function ReportDetail() {
     mutationFn: (status: IssueStatus) => api.updateStatus(reportId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["reports"] });
+      queryClient.invalidateQueries({ queryKey: ["reports", reportId] });
       toast.success("Status updated");
     },
     onError: () => toast.error("Couldn't update the status. Try again."),
+  });
+  const analyzeMutation = useMutation({
+    mutationFn: () => api.analyzeReport(reportId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["reports", reportId] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
+        queryClient.invalidateQueries({ queryKey: ["map-issues"] }),
+        queryClient.invalidateQueries({ queryKey: ["analytics"] }),
+      ]);
+      toast.success("Report analysis complete");
+    },
+    onError: () => toast.error("Couldn't analyze this report. Try again."),
   });
 
   return (
@@ -57,11 +71,29 @@ function ReportDetail() {
       title={data?.title ?? "Report"}
       subtitle={data ? `${data.id} · reported ${formatDate(data.createdAt)}` : undefined}
       actions={
-        <Button asChild variant="outline">
-          <Link to="/reports">
-            <ArrowLeft className="size-4" /> All reports
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => analyzeMutation.mutate()}
+            disabled={analyzeMutation.isPending || isLoading || isError}
+          >
+            {analyzeMutation.isPending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Brain className="size-4" />
+            )}
+            {analyzeMutation.isPending
+              ? "Analyzing…"
+              : data?.analysis
+                ? "Re-analyze"
+                : "Analyze report"}
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/reports">
+              <ArrowLeft className="size-4" /> All reports
+            </Link>
+          </Button>
+        </div>
       }
     >
       {isLoading ? (
@@ -174,15 +206,7 @@ function ReportDetail() {
   );
 }
 
-function Meta({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof MapPin;
-  label: string;
-  value: string;
-}) {
+function Meta({ icon: Icon, label, value }: { icon: typeof MapPin; label: string; value: string }) {
   return (
     <div>
       <dt className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">

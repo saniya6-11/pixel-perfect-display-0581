@@ -142,8 +142,7 @@ const seeds: Seed[] = [
   {
     id: "CL-2037",
     title: "Broken footpath railing near school",
-    description:
-      "Safety railing bent and detached at two points on the school approach road.",
+    description: "Safety railing bent and detached at two points on the school approach road.",
     category: "safety",
     severity: "medium",
     priority: 61,
@@ -180,8 +179,7 @@ const seeds: Seed[] = [
   {
     id: "CL-2035",
     title: "Cracked road surface after utility dig",
-    description:
-      "Trench refill has sunk, leaving a long ridge across the carriageway.",
+    description: "Trench refill has sunk, leaving a long ridge across the carriageway.",
     category: "road_damage",
     severity: "medium",
     priority: 58,
@@ -218,8 +216,7 @@ const seeds: Seed[] = [
   {
     id: "CL-2033",
     title: "Blocked storm drain on slope road",
-    description:
-      "Drain choked with leaves and plastic, water pools across the road after rain.",
+    description: "Drain choked with leaves and plastic, water pools across the road after rain.",
     category: "water",
     severity: "low",
     priority: 38,
@@ -237,8 +234,7 @@ const seeds: Seed[] = [
   {
     id: "CL-2032",
     title: "Illegal dumping at vacant plot",
-    description:
-      "Construction debris repeatedly dumped overnight on the vacant corner plot.",
+    description: "Construction debris repeatedly dumped overnight on the vacant corner plot.",
     category: "waste",
     severity: "high",
     priority: 71,

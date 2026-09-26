@@ -265,6 +265,8 @@ function DashboardPage() {
           <h3 className="mb-3 font-display text-base font-semibold">Highest priority</h3>
           {reports.isLoading ? (
             <SkeletonGrid count={3} />
+          ) : reports.isError ? (
+            <ErrorState onRetry={() => reports.refetch()} />
           ) : (reports.data?.length ?? 0) === 0 ? (
             <EmptyState
               title="No reports yet"

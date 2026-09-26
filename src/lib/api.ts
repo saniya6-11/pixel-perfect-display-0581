@@ -7,231 +7,350 @@ import type {
   Report,
   Severity,
 } from "@/types/civic";
-import { mockAnalytics, mockReports } from "./mock-data";
 
-/**
- * Centralised API service layer.
- *
- * Every screen talks to this module only — never to `fetch` directly.
- * Point it at a backend with VITE_API_URL (e.g. http://localhost:8000).
- *
- * Fallback: if VITE_API_URL is unset or the request fails, the demo dataset in
- * ./mock-data.ts is served instead so the UI stays usable. To go backend-only,
- * set ENABLE_MOCK_FALLBACK to false (or delete `withFallback`).
- */
+/** API root can be overridden for hosted deployments with VITE_API_URL. */
+export const API_URL = (import.meta.env["VITE_API_URL"] || "http://localhost:8000").replace(
+  /\/$/,
+  "",
+);
 
-export const API_URL: string = import.meta.env["VITE_API_URL"] ?? "";
-export const ENABLE_MOCK_FALLBACK = true;
+type BackendCategory =
+  "ROAD_DAMAGE" | "GARBAGE" | "STREETLIGHT" | "WATER_LEAK" | "PUBLIC_SAFETY" | "OTHER";
+type BackendSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+type BackendStatus = "NEW" | "UNDER_REVIEW" | "ASSIGNED" | "IN_PROGRESS" | "RESOLVED";
 
-export type ApiSource = "live" | "fallback";
+interface BackendReport {
+  id: number;
+  title: string;
+  description: string;
+  category: BackendCategory;
+  severity: BackendSeverity;
+  priority_score: number;
+  status: BackendStatus;
+  image_url: string | null;
+  latitude: number;
+  longitude: number;
+  location_name: string;
+  created_at: string;
+  updated_at: string;
+  ai_confidence: number | null;
+  ai_summary: string | null;
+  recommended_action: string | null;
+}
 
-let usingFallback = !API_URL;
-export const isUsingFallback = () => usingFallback;
+interface BackendAnalysis {
+  category: BackendCategory;
+  severity: BackendSeverity;
+  confidence: number;
+  priority_score: number;
+  summary: string;
+  recommended_action: string;
+  priority_factors?: Record<string, number>;
+  duplicate_count?: number;
+}
+
+interface BackendReportDetail {
+  report: BackendReport;
+  ai_analysis: {
+    confidence: number | null;
+    summary: string | null;
+    recommended_action: string | null;
+  };
+  location: { latitude: number; longitude: number; name: string };
+  priority: { priority_score: number; factors: Record<string, number> };
+  potential_duplicates: unknown[];
+  duplicate_count: number;
+}
+
+interface BackendAnalytics {
+  total_reports: number;
+  critical_reports: number;
+  resolved_reports: number;
+  ai_processed_reports: number;
+  reports_by_category: Record<BackendCategory, number>;
+  reports_by_severity: Record<BackendSeverity, number>;
+  reports_by_status: Record<BackendStatus, number>;
+  reports_over_time: { month: string; count: number; resolved?: number }[];
+  resolution_rate: number;
+  average_resolution_time: number;
+}
+
+const categoryFromBackend: Record<BackendCategory, IssueCategory> = {
+  ROAD_DAMAGE: "road_damage",
+  GARBAGE: "waste",
+  STREETLIGHT: "lighting",
+  WATER_LEAK: "water",
+  PUBLIC_SAFETY: "safety",
+  OTHER: "other",
+};
+const severityFromBackend: Record<BackendSeverity, Severity> = {
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
+  CRITICAL: "critical",
+};
+const statusFromBackend: Record<BackendStatus, IssueStatus> = {
+  NEW: "new",
+  UNDER_REVIEW: "under_review",
+  ASSIGNED: "assigned",
+  IN_PROGRESS: "in_progress",
+  RESOLVED: "resolved",
+};
+const statusToBackend: Record<IssueStatus, BackendStatus> = {
+  new: "NEW",
+  under_review: "UNDER_REVIEW",
+  assigned: "ASSIGNED",
+  in_progress: "IN_PROGRESS",
+  resolved: "RESOLVED",
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!API_URL) throw new Error("VITE_API_URL is not configured");
-  const res = await fetch(`${API_URL.replace(/\/$/, "")}${path}`, {
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-    ...init,
-  });
-  if (!res.ok) throw new Error(`Request failed (${res.status})`);
-  return (await res.json()) as T;
-}
-
-async function withFallback<T>(live: () => Promise<T>, fallback: () => T): Promise<T> {
+  let response: Response;
   try {
-    const data = await live();
-    usingFallback = false;
-    return data;
-  } catch (error) {
-    if (!ENABLE_MOCK_FALLBACK) throw error;
-    usingFallback = true;
-    return fallback();
+    response = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...init?.headers },
+    });
+  } catch {
+    throw new Error(`Can't reach CivicLens API at ${API_URL}. Check that the backend is running.`);
   }
+  if (!response.ok) {
+    let detail = `Request failed (${response.status})`;
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      if (typeof body.detail === "string") detail = body.detail;
+      else if (Array.isArray(body.detail)) detail = body.detail.map((item) => item.msg).join("; ");
+    } catch {
+      // Keep the useful HTTP status if the server didn't return JSON.
+    }
+    throw new Error(detail);
+  }
+  return (await response.json()) as T;
 }
 
-/* ---------- local store backing the fallback mode ---------- */
+function factorsToList(factors: Record<string, number> = {}) {
+  const labels: Record<string, string> = {
+    severity: "Severity",
+    public_impact: "Public impact",
+    duplicate_reports: "Duplicate reports",
+    age: "Time unresolved",
+    location_exposure: "Location exposure",
+  };
+  return Object.entries(factors).map(([key, value]) => ({
+    label: labels[key] ?? key.replaceAll("_", " "),
+    value: `${value} pts`,
+    weight: Math.min(100, Math.max(0, value * 2)),
+  }));
+}
 
-let localReports: Report[] = [...mockReports];
-
-/* ---------- heuristic analyser used when no backend is present ---------- */
-
-const KEYWORDS: { category: IssueCategory; words: string[]; detected: string; action: string }[] = [
-  {
-    category: "road_damage",
-    words: ["pothole", "road", "asphalt", "crack", "tar", "carriageway", "speed breaker"],
-    detected: "Large pothole / road surface damage",
-    action: "Immediate inspection and temporary barricading recommended.",
-  },
-  {
-    category: "waste",
-    words: ["garbage", "trash", "waste", "bin", "dump", "litter", "debris"],
-    detected: "Solid waste accumulation / uncollected bins",
-    action: "Schedule an additional collection round within 24 hours.",
-  },
-  {
-    category: "water",
-    words: ["water", "leak", "pipe", "drain", "flood", "sewage", "overflow"],
-    detected: "Water leakage / drainage obstruction",
-    action: "Dispatch the water crew and isolate the affected line.",
-  },
-  {
-    category: "lighting",
-    words: ["light", "lamp", "streetlight", "dark", "bulb", "pole"],
-    detected: "Non-functional or damaged street lighting",
-    action: "Isolate the supply and replace the faulty fixture.",
-  },
-  {
-    category: "safety",
-    words: ["unsafe", "railing", "danger", "wire", "collapse", "broken", "hazard", "crossing"],
-    detected: "Unsafe public infrastructure",
-    action: "Cordon the area and schedule a structural inspection.",
-  },
-];
-
-function analyseLocally(description: string, hasImage: boolean): AIAnalysis {
-  const text = description.toLowerCase();
-  let best = KEYWORDS[0]!;
-  let hits = 0;
-  for (const entry of KEYWORDS) {
-    const count = entry.words.filter((w) => text.includes(w)).length;
-    if (count > hits) {
-      hits = count;
-      best = entry;
-    }
-  }
-  const urgencyWords = ["danger", "urgent", "accident", "injur", "exposed", "child", "flood", "collapse"];
-  const urgency = urgencyWords.filter((w) => text.includes(w)).length;
-
-  const severity: Severity =
-    urgency >= 2 ? "critical" : urgency === 1 ? "high" : text.length > 140 ? "medium" : "low";
-
-  const severityWeight = { critical: 92, high: 78, medium: 58, low: 40 }[severity];
-  const confidence = Math.min(97, 62 + hits * 9 + (hasImage ? 12 : 0) + Math.min(10, text.length / 20));
-  const duplicateCount = hits > 1 ? 3 : hits === 1 ? 1 : 0;
-  const priorityScore = Math.round(
-    Math.min(99, severityWeight * 0.62 + confidence * 0.22 + duplicateCount * 4 + (hasImage ? 5 : 0)),
-  );
-
+function analysisFromBackend(value: BackendAnalysis): AIAnalysis {
   return {
-    category: hits === 0 ? "other" : best.category,
-    confidence: Math.round(confidence),
-    severity,
-    priorityScore,
-    detectedIssue: hits === 0 ? "Unclassified civic issue" : best.detected,
-    recommendedAction:
-      hits === 0 ? "Manual triage recommended — description lacks clear signals." : best.action,
-    duplicateCount,
+    category: categoryFromBackend[value.category],
+    confidence: Math.round(value.confidence <= 1 ? value.confidence * 100 : value.confidence),
+    severity: severityFromBackend[value.severity],
+    priorityScore: value.priority_score,
+    detectedIssue: value.summary,
+    recommendedAction: value.recommended_action,
+    duplicateCount: value.duplicate_count ?? 0,
+    factors: factorsToList(value.priority_factors),
     analyzedAt: new Date().toISOString(),
-    factors: [
-      { label: "Severity", value: severity.toUpperCase(), weight: severityWeight },
+  };
+}
+
+function reportFromBackend(
+  value: BackendReport,
+  factors?: Record<string, number>,
+  duplicateCount = 0,
+): Report {
+  const hasAnalysis = value.ai_confidence !== null || value.ai_summary !== null;
+  const analysis = hasAnalysis
+    ? analysisFromBackend({
+        category: value.category,
+        severity: value.severity,
+        confidence: value.ai_confidence ?? 0,
+        priority_score: value.priority_score,
+        summary: value.ai_summary ?? "Civic report classified by the analysis service.",
+        recommended_action:
+          value.recommended_action ?? "Review this report and assign it to the appropriate team.",
+        priority_factors: factors ?? {},
+        duplicate_count: duplicateCount,
+      })
+    : null;
+  return {
+    id: String(value.id),
+    title: value.title,
+    description: value.description,
+    imageUrl: value.image_url,
+    location: { lat: value.latitude, lng: value.longitude, address: value.location_name },
+    status: statusFromBackend[value.status],
+    createdAt: value.created_at,
+    reporter: "Community",
+    analysis,
+    timeline: [
+      { label: "Reported", at: value.created_at, done: true },
+      { label: "AI analyzed", at: analysis ? value.updated_at : null, done: Boolean(analysis) },
       {
-        label: "Public impact",
-        value: priorityScore > 75 ? "High" : priorityScore > 50 ? "Medium" : "Low",
-        weight: Math.min(100, priorityScore + 5),
+        label: "Assigned",
+        at: ["ASSIGNED", "IN_PROGRESS", "RESOLVED"].includes(value.status)
+          ? value.updated_at
+          : null,
+        done: ["ASSIGNED", "IN_PROGRESS", "RESOLVED"].includes(value.status),
       },
       {
-        label: "Location exposure",
-        value: priorityScore > 70 ? "High" : "Medium",
-        weight: Math.max(30, priorityScore - 15),
+        label: "In progress",
+        at: ["IN_PROGRESS", "RESOLVED"].includes(value.status) ? value.updated_at : null,
+        done: ["IN_PROGRESS", "RESOLVED"].includes(value.status),
       },
-      { label: "Duplicate reports", value: `${duplicateCount}`, weight: duplicateCount * 25 },
-      { label: "Time unresolved", value: "0 days", weight: 5 },
+      {
+        label: "Resolved",
+        at: value.status === "RESOLVED" ? value.updated_at : null,
+        done: value.status === "RESOLVED",
+      },
     ],
   };
 }
 
-/* ---------- public API ---------- */
+function analyticsFromBackend(value: BackendAnalytics): Analytics {
+  const byCategory = Object.entries(value.reports_by_category).map(([key, count]) => ({
+    name: categoryFromBackend[key as BackendCategory].replaceAll("_", " "),
+    value: count,
+  }));
+  const bySeverity = Object.entries(value.reports_by_severity).map(([key, count]) => ({
+    name:
+      severityFromBackend[key as BackendSeverity][0]!.toUpperCase() +
+      severityFromBackend[key as BackendSeverity].slice(1),
+    value: count,
+    key: severityFromBackend[key as BackendSeverity],
+  }));
+  const byStatus = Object.entries(value.reports_by_status).map(([key, count]) => ({
+    name: statusFromBackend[key as BackendStatus].replaceAll("_", " "),
+    value: count,
+  }));
+  const categoryTotal = byCategory.reduce((total, item) => total + item.value, 0);
+  return {
+    totals: {
+      totalReports: value.total_reports,
+      criticalIssues: value.critical_reports,
+      resolved: value.resolved_reports,
+      aiProcessed: value.ai_processed_reports,
+    },
+    deltas: { totalReports: 0, criticalIssues: 0, resolved: 0, aiProcessed: 0 },
+    byCategory,
+    bySeverity,
+    overTime: value.reports_over_time.map((item) => ({
+      date: item.month,
+      reports: item.count,
+      resolved: item.resolved ?? 0,
+    })),
+    byStatus,
+    resolutionRate: value.resolution_rate,
+    avgResolutionDays: value.average_resolution_time,
+    insights: [
+      {
+        id: "resolution-rate",
+        title: "Resolution rate",
+        detail: "Share of reported issues marked resolved.",
+        metric: `${Math.round(value.resolution_rate * 100)}%`,
+        tone: "success",
+      },
+      {
+        id: "largest-category",
+        title: "Most reported category",
+        detail: "Category with the highest report volume.",
+        metric: [...byCategory].sort((a, b) => b.value - a.value)[0]?.name ?? "No reports",
+        tone: "accent",
+      },
+      {
+        id: "ai-coverage",
+        title: "AI coverage",
+        detail: "Reports processed by the analysis service.",
+        metric: categoryTotal
+          ? `${Math.round((value.ai_processed_reports / categoryTotal) * 100)}%`
+          : "0%",
+        tone: "warning",
+      },
+    ],
+  };
+}
 
 export const api = {
-  listReports: () =>
-    withFallback(
-      () => request<Report[]>("/api/reports"),
-      () => [...localReports],
-    ),
+  async listReports(): Promise<Report[]> {
+    const reports = await request<BackendReport[]>("/api/reports");
+    return reports.map((report) => reportFromBackend(report));
+  },
 
-  getReport: (id: string) =>
-    withFallback(
-      () => request<Report>(`/api/reports/${id}`),
-      () => {
-        const found = localReports.find((r) => r.id === id);
-        if (!found) throw new Error("Report not found");
-        return found;
-      },
-    ),
+  async getReport(id: string): Promise<Report> {
+    const detail = await request<BackendReportDetail>(`/api/reports/${encodeURIComponent(id)}`);
+    return reportFromBackend(detail.report, detail.priority.factors, detail.duplicate_count);
+  },
 
-  createReport: (input: CreateReportInput) =>
-    withFallback(
-      () =>
-        request<Report>("/api/reports", {
-          method: "POST",
-          body: JSON.stringify(input),
+  async createReport(input: CreateReportInput): Promise<Report> {
+    const created = await request<BackendReport>("/api/reports", {
+      method: "POST",
+      body: JSON.stringify({
+        title: input.title,
+        description: input.description,
+        latitude: input.location.lat,
+        longitude: input.location.lng,
+        location_name: input.location.address,
+        image_url: input.imageDataUrl,
+      }),
+    });
+    return reportFromBackend(created);
+  },
+
+  async analyzeReport(id: string): Promise<AIAnalysis> {
+    const result = await request<BackendAnalysis>(
+      `/api/reports/${encodeURIComponent(id)}/analyze`,
+      { method: "POST" },
+    );
+    return analysisFromBackend(result);
+  },
+
+  async updateStatus(id: string, status: IssueStatus): Promise<Report> {
+    const updated = await request<BackendReport>(`/api/reports/${encodeURIComponent(id)}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: statusToBackend[status] }),
+    });
+    return reportFromBackend(updated);
+  },
+
+  async getAnalytics(): Promise<Analytics> {
+    return analyticsFromBackend(await request<BackendAnalytics>("/api/analytics"));
+  },
+
+  async getMapIssues(): Promise<Report[]> {
+    const [issues, reports] = await Promise.all([
+      request<
+        {
+          id: number;
+          latitude: number;
+          longitude: number;
+          category: BackendCategory;
+          severity: BackendSeverity;
+          priority_score: number;
+          status: BackendStatus;
+        }[]
+      >("/api/map/issues"),
+      request<BackendReport[]>("/api/reports"),
+    ]);
+    const byId = new Map(reports.map((report) => [report.id, report]));
+    return issues.flatMap((issue) => {
+      const report = byId.get(issue.id);
+      if (!report) return [];
+      return [
+        reportFromBackend({
+          ...report,
+          latitude: issue.latitude,
+          longitude: issue.longitude,
+          category: issue.category,
+          severity: issue.severity,
+          priority_score: issue.priority_score,
+          status: issue.status,
         }),
-      () => {
-        const id = `CL-${2042 + localReports.length - mockReports.length}`;
-        const createdAt = new Date().toISOString();
-        const report: Report = {
-          id,
-          title: input.description.split(/[.\n]/)[0]?.slice(0, 70) || "Citizen report",
-          description: input.description,
-          imageUrl: input.imageDataUrl,
-          location: input.location,
-          status: "new",
-          createdAt,
-          reporter: "You",
-          analysis: null,
-          timeline: [
-            { label: "Reported", at: createdAt, done: true },
-            { label: "AI analyzed", at: null, done: false },
-            { label: "Assigned", at: null, done: false },
-            { label: "In progress", at: null, done: false },
-            { label: "Resolved", at: null, done: false },
-          ],
-        };
-        localReports = [report, ...localReports];
-        return report;
-      },
-    ),
-
-  analyzeReport: (id: string) =>
-    withFallback(
-      () => request<AIAnalysis>(`/api/reports/${id}/analyze`, { method: "POST" }),
-      () => {
-        const report = localReports.find((r) => r.id === id);
-        if (!report) throw new Error("Report not found");
-        const analysis = analyseLocally(report.description, Boolean(report.imageUrl));
-        report.analysis = analysis;
-        report.timeline[1] = { label: "AI analyzed", at: new Date().toISOString(), done: true };
-        return analysis;
-      },
-    ),
-
-  updateStatus: (id: string, status: IssueStatus) =>
-    withFallback(
-      () =>
-        request<Report>(`/api/reports/${id}/status`, {
-          method: "PATCH",
-          body: JSON.stringify({ status }),
-        }),
-      () => {
-        const report = localReports.find((r) => r.id === id);
-        if (!report) throw new Error("Report not found");
-        report.status = status;
-        return report;
-      },
-    ),
-
-  getAnalytics: () =>
-    withFallback(
-      () => request<Analytics>("/api/analytics"),
-      () => mockAnalytics,
-    ),
-
-  getMapIssues: () =>
-    withFallback(
-      () => request<Report[]>("/api/map/issues"),
-      () => [...localReports],
-    ),
+      ];
+    });
+  },
 };
 
 export const queries = {

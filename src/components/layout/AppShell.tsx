@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarContent } from "./Sidebar";
-import { isUsingFallback } from "@/lib/api";
 
 export function AppShell({
   title,
@@ -15,7 +14,7 @@ export function AppShell({
   children,
 }: {
   title: string;
-  subtitle?: string;
+  subtitle?: string | undefined;
   actions?: ReactNode;
   children: ReactNode;
 }) {
@@ -31,7 +30,12 @@ export function AppShell({
         <header className="glass-panel sticky top-0 z-30 flex flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Open navigation">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                aria-label="Open navigation"
+              >
                 <Menu className="size-5" />
               </Button>
             </SheetTrigger>
@@ -77,11 +81,6 @@ export function AppShell({
             </div>
             {actions}
           </div>
-          {isUsingFallback() ? (
-            <p className="mb-5 rounded-lg border border-warning/30 bg-warning-soft px-4 py-2.5 text-xs text-warning-foreground">
-              Demo data — connect a backend with VITE_API_URL to show live reports.
-            </p>
-          ) : null}
           {children}
         </main>
       </div>

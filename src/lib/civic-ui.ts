@@ -18,6 +18,7 @@ export const statusStyles: Record<IssueStatus, string> = {
   new: "bg-accent-soft text-accent-foreground border-accent/30",
   under_review: "bg-warning-soft text-warning-foreground border-warning/30",
   assigned: "bg-primary-soft text-primary border-primary/20",
+  in_progress: "bg-high-soft text-high border-high/25",
   resolved: "bg-success-soft text-success border-success/25",
 };
 

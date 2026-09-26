@@ -44,8 +44,7 @@ function ReportsPage() {
   const [period, setPeriod] = useState("all");
 
   const filtered = useMemo(() => {
-    const cutoff =
-      period === "all" ? 0 : Date.now() - Number(period) * 86_400_000;
+    const cutoff = period === "all" ? 0 : Date.now() - Number(period) * 86_400_000;
     return (data ?? []).filter((r) => {
       if (search) {
         const hay = `${r.id} ${r.title} ${r.description} ${r.location.address}`.toLowerCase();

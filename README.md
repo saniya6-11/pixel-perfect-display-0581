@@ -1,24 +1,33 @@
-# Pixel Perfect
+# CivicLens
 
-Implement exactly the screenshot and nothing else
+CivicLens pairs the existing Lovable React/Vite interface with a FastAPI API for civic reports, analysis, map issues, and analytics.
 
-This project was built with [Lovable](https://lovable.dev).
+## Project layout
 
-## Build with Lovable
+- `src/` — existing React frontend and routes.
+- `backend/` — FastAPI application, SQLAlchemy models, and seed script.
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/d5443fbd-3a10-4cb1-89a5-124891ea4667).
+## Run locally
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+Start the API in one terminal:
 
-## Development
+```powershell
+cd backend
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+python seed.py
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Start the frontend in a second terminal from the repository root:
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm install
 npm run dev
 ```
+
+The frontend runs at <http://localhost:5173>, and FastAPI docs are at <http://localhost:8000/docs>. The frontend reads its API origin from `VITE_API_URL`; copy `.env.example` to `.env.local` to override the default `http://localhost:8000`.
+
+For deployment, run Uvicorn from `backend/` with `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Set `DATABASE_URL` and `FRONTEND_ORIGINS` for the deployment environment.

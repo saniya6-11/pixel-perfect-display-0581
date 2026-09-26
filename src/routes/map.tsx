@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/AppShell";
 import { MapView, toMarkers } from "@/components/civic/MapView";
 import { IssueCard } from "@/components/civic/IssueCard";
-import { EmptyState, LoadingState } from "@/components/civic/states";
+import { EmptyState, ErrorState, LoadingState } from "@/components/civic/states";
 import { Button } from "@/components/ui/button";
 import { categoryFilters, severityMarkerColor } from "@/lib/civic-ui";
 import { queries } from "@/lib/api";
@@ -30,7 +30,7 @@ export const Route = createFileRoute("/map")({
 
 function CivicMapPage() {
   const navigate = useNavigate();
-  const { data, isLoading } = useQuery(queries.mapIssues());
+  const { data, isLoading, isError, refetch } = useQuery(queries.mapIssues());
   const [filter, setFilter] = useState<string>("all");
 
   const filtered = useMemo(() => {
@@ -71,6 +71,8 @@ function CivicMapPage() {
           <div className="h-[32rem]">
             {isLoading ? (
               <LoadingState label="Loading civic map…" className="h-full rounded-none border-0" />
+            ) : isError ? (
+              <ErrorState className="h-full rounded-none" onRetry={() => refetch()} />
             ) : (
               <MapView
                 markers={toMarkers(filtered)}

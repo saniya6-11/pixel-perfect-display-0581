@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Brain,
@@ -12,9 +13,9 @@ import {
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { mockAnalytics, mockReports } from "@/lib/mock-data";
 import { SeverityBadge } from "@/components/civic/badges";
 import { PriorityBar } from "@/components/civic/PriorityScore";
+import { queries } from "@/lib/api";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -67,6 +68,8 @@ const steps = [
 ];
 
 function Landing() {
+  const reports = useQuery(queries.reports());
+  const analytics = useQuery(queries.analytics());
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 glass-panel">
@@ -129,9 +132,14 @@ function Landing() {
             </div>
             <dl className="mt-10 grid max-w-md grid-cols-3 gap-6">
               {[
-                ["127", "Reports processed"],
-                ["94%", "Avg. AI confidence"],
-                ["3.8d", "Avg. resolution"],
+                [String(analytics.data?.totals.totalReports ?? "—"), "Reports processed"],
+                [
+                  analytics.data
+                    ? `${analytics.data.totals.totalReports ? Math.round((analytics.data.totals.aiProcessed / analytics.data.totals.totalReports) * 100) : 0}%`
+                    : "—",
+                  "AI coverage",
+                ],
+                [analytics.data ? `${analytics.data.avgResolutionDays}d` : "—", "Avg. resolution"],
               ].map(([value, label]) => (
                 <div key={label}>
                   <dt className="font-display text-2xl font-bold text-white">{value}</dt>
@@ -141,7 +149,11 @@ function Landing() {
             </dl>
           </div>
 
-          <DashboardPreview />
+          <DashboardPreview
+            reports={reports.data ?? []}
+            analytics={analytics.data}
+            loading={reports.isLoading || analytics.isLoading}
+          />
         </div>
       </section>
 
@@ -205,15 +217,27 @@ function Landing() {
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-muted-foreground sm:px-6 lg:px-8">
           <p>CivicLens — civic issue intelligence</p>
-          <p>Demo data shown until a backend is connected.</p>
+          <p>Live civic issue intelligence</p>
         </div>
       </footer>
     </div>
   );
 }
 
-function DashboardPreview() {
-  const top = mockReports.slice(0, 3);
+function DashboardPreview({
+  reports,
+  analytics,
+  loading,
+}: {
+  reports: import("@/types/civic").Report[];
+  analytics: import("@/types/civic").Analytics | undefined;
+  loading: boolean;
+}) {
+  const top = [...reports]
+    .sort((a, b) => (b.analysis?.priorityScore ?? 0) - (a.analysis?.priorityScore ?? 0))
+    .slice(0, 3);
+  const bars = analytics?.overTime.slice(-12).map((item) => item.reports) ?? [];
+  const maxBar = Math.max(1, ...bars);
   return (
     <div className="relative">
       <div className="rounded-2xl border border-white/15 bg-white/10 p-2 shadow-[var(--shadow-lift)] backdrop-blur">
@@ -229,12 +253,15 @@ function DashboardPreview() {
 
           <div className="grid grid-cols-4 gap-2 p-4 pb-0">
             {[
-              ["Total", mockAnalytics.totals.totalReports],
-              ["Critical", mockAnalytics.totals.criticalIssues],
-              ["Resolved", mockAnalytics.totals.resolved],
-              ["AI", mockAnalytics.totals.aiProcessed],
+              ["Total", analytics?.totals.totalReports ?? (loading ? "…" : 0)],
+              ["Critical", analytics?.totals.criticalIssues ?? (loading ? "…" : 0)],
+              ["Resolved", analytics?.totals.resolved ?? (loading ? "…" : 0)],
+              ["AI", analytics?.totals.aiProcessed ?? (loading ? "…" : 0)],
             ].map(([label, value]) => (
-              <div key={String(label)} className="rounded-lg border border-border bg-background p-2.5">
+              <div
+                key={String(label)}
+                className="rounded-lg border border-border bg-background p-2.5"
+              >
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                   {label}
                 </p>
@@ -245,16 +272,24 @@ function DashboardPreview() {
 
           <div className="p-4">
             <div className="flex h-24 items-end gap-1.5 rounded-lg border border-border bg-background p-3">
-              {[38, 52, 44, 68, 58, 80, 72, 91, 64, 76, 88, 60].map((h, i) => (
+              {(bars.length ? bars : [0]).map((count, i) => (
                 <span
                   key={i}
                   className="accent-surface flex-1 rounded-sm"
-                  style={{ height: `${h}%`, opacity: 0.55 + i / 30 }}
+                  style={{
+                    height: `${Math.max(6, (count / maxBar) * 100)}%`,
+                    opacity: 0.55 + i / 30,
+                  }}
                 />
               ))}
             </div>
 
             <ul className="mt-3 space-y-2">
+              {!loading && top.length === 0 ? (
+                <li className="rounded-lg border border-border bg-background px-3 py-4 text-xs text-muted-foreground">
+                  No reports yet. Submit the first civic issue.
+                </li>
+              ) : null}
               {top.map((r) => (
                 <li
                   key={r.id}
@@ -262,7 +297,9 @@ function DashboardPreview() {
                 >
                   <Wrench className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span className="min-w-0 flex-1 truncate text-xs font-medium">{r.title}</span>
-                  {r.analysis ? <SeverityBadge severity={r.analysis.severity} showIcon={false} /> : null}
+                  {r.analysis ? (
+                    <SeverityBadge severity={r.analysis.severity} showIcon={false} />
+                  ) : null}
                   {r.analysis ? (
                     <PriorityBar score={r.analysis.priorityScore} className="hidden sm:flex" />
                   ) : null}
