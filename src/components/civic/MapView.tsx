@@ -1,7 +1,8 @@
 import { Suspense, lazy } from "react";
 import { MapPinned } from "lucide-react";
 import { ClientOnly } from "./ClientOnly";
-import type { MapViewProps } from "./map-types";
+import type { MapMarker, MapViewProps } from "./map-types";
+import type { Report } from "@/types/civic";
 
 const MapViewImpl = lazy(() => import("./MapViewImpl"));
 
