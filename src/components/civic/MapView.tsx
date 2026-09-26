@@ -26,23 +26,16 @@ export function MapView(props: MapViewProps) {
   );
 }
 
-export function toMarkers(
-  reports: {
-    id: string;
-    title: string;
-    location: { lat: number; lng: number; address: string };
-    analysis: { severity: MapViewProps extends never ? never : string; priorityScore: number } | null;
-  }[],
-) {
+export function toMarkers(reports: Report[]): MapMarker[] {
   return reports
-    .filter((r) => r.analysis)
+    .filter((r) => r.analysis !== null)
     .map((r) => ({
       id: r.id,
       lat: r.location.lat,
       lng: r.location.lng,
       address: r.location.address,
       title: r.title,
-      severity: r.analysis!.severity as never,
+      severity: r.analysis!.severity,
       priority: r.analysis!.priorityScore,
     }));
 }
